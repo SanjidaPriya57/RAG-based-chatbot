@@ -1,0 +1,7 @@
+fastapi 
+uvicorn
+anthropic
+asyncpg
+redis
+pypdf2
+python-multipart
