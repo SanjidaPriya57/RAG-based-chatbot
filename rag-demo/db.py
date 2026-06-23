@@ -65,6 +65,7 @@ async def init_db():
                 CREATE TABLE IF NOT EXISTS conversations (
                     id SERIAL PRIMARY KEY,
                     user_id VARCHAR(255) NOT NULL,
+                    session_id VARCHAR(255) NOT NULL,
                     message TEXT NOT NULL,
                     response TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

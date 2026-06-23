@@ -10,14 +10,14 @@ from rag.retriever import DocumentRetriever
 from memory.cache import get_cache, set_cache
 
 
-async def get_conversation_history(conn, user_id: str, limit: int = 10) -> list:
+async def get_conversation_history(conn, user_id: str, session_id: str, limit: int = 10) -> list:
     rows = await conn.fetch("""
         SELECT message, response FROM conversations
-        WHERE user_id = $1
+        WHERE user_id = $1 AND session_id = $2
         ORDER BY created_at DESC
-        LIMIT $2
-    """, user_id, limit)
-    return list(reversed(rows))  # oldest first
+        LIMIT $3
+    """, user_id, session_id, limit)
+    return list(reversed(rows))
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,6 +25,7 @@ router = APIRouter()
 
 class AskRequest(BaseModel):
     query: str
+    session_id: str
     top_k: int = 5
 
 
@@ -53,7 +54,7 @@ async def ask_question(request: AskRequest, user_id: str = Header(...), conn: as
                 status_code=400, detail="Query cannot be empty")
 
         # Check cache first
-        cache_key = f"answer:{user_id}:{query}"
+        cache_key = f"answer:{user_id}:{request.session_id}:{query}"
         cached_answer = await get_cache(cache_key)
         if cached_answer:
             logger.info(f"Cache hit for query: {query}")
@@ -79,15 +80,15 @@ async def ask_question(request: AskRequest, user_id: str = Header(...), conn: as
 
         context = retriever.format_context(retrieved_chunks)
 
-        prompt = f"""You are a helpful finance assistant. Answer based on the context below.
+        prompt = f"""You are a personal finance assistant embedded in a finance app. 
+        You have access to the user's financial documents, transactions, and history.
+        Answer naturally and conversationally like ChatGPT would.
+        Use the context below to answer — but don't mention "documents" or "context" to the user.
 
-        Context:
-        {context}
-
-        Question: {query}"""
+        {context}"""
 
         # Format context from retrieved chunks
-        history = await get_conversation_history(conn, user_id)
+        history = await get_conversation_history(conn, user_id, request.session_id)
         messages = []
         for row in history:
             messages.append({"role": "user", "content": row["message"]})
@@ -103,8 +104,8 @@ async def ask_question(request: AskRequest, user_id: str = Header(...), conn: as
         answer = gpt_response.choices[0].message.content
 
         await conn.execute(
-            "INSERT INTO conversations (user_id, message, response) VALUES ($1, $2, $3)",
-            user_id, query, answer
+            "INSERT INTO conversations (user_id, session_id, message, response) VALUES ($1, $2, $3, $4)",
+            user_id, request.session_id, query, answer
         )
 
         sources = [chunk for chunk, _ in retrieved_chunks]

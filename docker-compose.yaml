@@ -20,8 +20,10 @@ services:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_DB=finance_db
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - backend
 
@@ -36,9 +38,14 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "5434:5432"
     networks:
       - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:6-alpine
@@ -56,7 +63,7 @@ services:
     container_name: ai-finance-redis-commander
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "8082:8081"
     environment:
       - REDIS_HOSTS=local:redis:6379
     depends_on:
