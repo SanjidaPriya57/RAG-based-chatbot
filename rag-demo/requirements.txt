@@ -3,5 +3,9 @@ uvicorn
 anthropic
 asyncpg
 redis
-pypdf2
+pypdf
 python-multipart
+numpy
+openai
+openpyxl
+pandas
