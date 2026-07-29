@@ -36,10 +36,15 @@ async def init_db():
                     user_id VARCHAR(255) NOT NULL,
                     filename VARCHAR(255) NOT NULL,
                     content TEXT NOT NULL,
+                    image_key VARCHAR(512),
+                    is_image BOOLEAN DEFAULT FALSE,
                     uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
+
+            await conn.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS image_key VARCHAR(512);")
+            await conn.execute("ALTER TABLE documents ADD COLUMN IF NOT EXISTS is_image BOOLEAN DEFAULT FALSE;")
 
             await conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);

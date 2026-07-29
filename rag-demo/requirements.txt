@@ -9,3 +9,4 @@ numpy
 openai
 openpyxl
 pandas
+boto3

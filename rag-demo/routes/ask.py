@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 import asyncpg
 from openai import AsyncOpenAI
+from s3_client import get_image_url
 
 from db import get_db
 from rag.embeddings import EmbeddingService
@@ -80,6 +81,10 @@ async def ask_question(request: AskRequest, user_id: str = Header(...), conn: as
 
         context = retriever.format_context(retrieved_chunks)
 
+        sources = [chunk for chunk, _, _, _ in retrieved_chunks]
+        image_keys = list({img_key for _, _, img_key,
+                           is_img in retrieved_chunks if is_img and img_key})
+
         prompt = f"""You are a personal finance assistant embedded in a finance app. 
         You have access to the user's financial documents, transactions, and history.
         Answer naturally and conversationally like ChatGPT would.
@@ -95,6 +100,14 @@ async def ask_question(request: AskRequest, user_id: str = Header(...), conn: as
             messages.append({"role": "assistant", "content": row["response"]})
         messages.append({"role": "user", "content": prompt})
 
+        if image_keys:
+            image_urls = [get_image_url(key) for key in image_keys]
+            vision_content = [{"type": "text", "text": prompt}]
+            for url in image_urls:
+                vision_content.append(
+                    {"type": "image_url", "image_url": {"url": url}})
+            messages[-1] = {"role": "user", "content": vision_content}
+
         client = AsyncOpenAI()
         gpt_response = await client.chat.completions.create(
             model="gpt-4o",
@@ -107,8 +120,6 @@ async def ask_question(request: AskRequest, user_id: str = Header(...), conn: as
             "INSERT INTO conversations (user_id, session_id, message, response) VALUES ($1, $2, $3, $4)",
             user_id, request.session_id, query, answer
         )
-
-        sources = [chunk for chunk, _ in retrieved_chunks]
 
         response = AskResponse(query=query, answer=answer, sources=sources)
 

@@ -23,7 +23,9 @@ class DocumentRetriever:
 
         rows = await conn.fetch("""
             SELECT dc.chunk_text, 
-                1 - (dc.embedding <=> $1::vector) as similarity
+                1 - (dc.embedding <=> $1::vector) as similarity,
+                d.image_key,
+                d.is_image
             FROM document_chunks dc
             JOIN documents d ON d.id = dc.document_id
             WHERE d.user_id = $2
@@ -32,14 +34,14 @@ class DocumentRetriever:
             LIMIT $4
         """, f"[{','.join(map(str, query_embedding))}]", user_id, similarity_threshold, top_k)
 
-        return [(row["chunk_text"], row["similarity"]) for row in rows]
+        return [(row["chunk_text"], row["similarity"], row["image_key"], row["is_image"]) for row in rows]
 
-    def format_context(self, chunks: List[Tuple[str, float]]) -> str:
+    def format_context(self, chunks: List[Tuple[str, float, str, bool]]) -> str:
         """
         Format retrieved chunks into context string.
 
         Args:
-            chunks: List of (chunk_text, similarity_score) tuples
+            chunks: List of (chunk_text, similarity_score, image_key, is_image) tuples
 
         Returns:
             Formatted context string
@@ -48,7 +50,7 @@ class DocumentRetriever:
             return "No relevant documents found."
 
         context = "Relevant information from documents:\n\n"
-        for i, (chunk, score) in enumerate(chunks, 1):
+        for i, (chunk, score, image_key, is_image) in enumerate(chunks, 1):
             context += f"[Document {i} - Confidence: {score:.2f}]\n{chunk}\n\n"
 
         return context

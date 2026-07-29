@@ -3,6 +3,7 @@ import logging
 from fastapi import APIRouter, File, Header, UploadFile, Depends, HTTPException
 import asyncpg
 import pypdf
+from s3_client import upload_image_to_s3
 
 from db import get_db
 from rag.chunker import DocumentChunker
@@ -71,6 +72,9 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Header(..
 
         # Extract text from PDF
         filename = file.filename.lower()
+        image_key = None
+        is_image = filename.endswith(
+            (".jpg", ".jpeg", ".png", ".heic", ".webp"))
 
         if filename.endswith(".pdf"):
             pdf_reader = pypdf.PdfReader(io.BytesIO(content))
@@ -79,12 +83,19 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Header(..
                 text_content += page.extract_text() + "\n"
         elif filename.endswith((".jpg", ".jpeg")):
             text_content = await extract_text_from_image(content, "image/jpeg")
+            image_key = upload_image_to_s3(
+                content, file.filename, "image/jpeg")
         elif filename.endswith(".png"):
             text_content = await extract_text_from_image(content, "image/png")
+            image_key = upload_image_to_s3(content, file.filename, "image/png")
         elif filename.endswith(".heic"):
             text_content = await extract_text_from_image(content, "image/heic")
+            image_key = upload_image_to_s3(
+                content, file.filename, "image/heic")
         elif filename.endswith(".webp"):
             text_content = await extract_text_from_image(content, "image/webp")
+            image_key = upload_image_to_s3(
+                content, file.filename, "image/webp")
         elif filename.endswith(".xlsx"):
             text_content = await extract_text_from_excel(content)
         elif filename.endswith(".csv"):
@@ -96,10 +107,12 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Header(..
 
         # Store document metadata
         doc_id = await conn.fetchval(
-            "INSERT INTO documents (user_id, filename, content) VALUES ($1, $2, $3) RETURNING id",
+            "INSERT INTO documents (user_id, filename, content, image_key, is_image) VALUES ($1, $2, $3, $4, $5) RETURNING id",
             user_id,
             file.filename,
-            text_content
+            text_content,
+            image_key,
+            is_image
         )
 
         # Chunk document
