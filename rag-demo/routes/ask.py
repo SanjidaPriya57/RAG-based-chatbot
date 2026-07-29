@@ -37,7 +37,7 @@ class AskResponse(BaseModel):
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask_question(request: AskRequest, user_id: str = Header(...), conn: asyncpg.Connection = Depends(get_db)):
+async def ask_question(request: AskRequest, user_id: str = Header(..., convert_underscores=False), conn: asyncpg.Connection = Depends(get_db)):
     """
     Ask a question over the indexed documents using RAG.
 

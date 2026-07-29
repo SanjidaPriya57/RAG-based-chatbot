@@ -53,7 +53,7 @@ async def extract_text_from_csv(file_bytes: bytes) -> str:
 
 
 @router.post("/upload")
-async def upload_document(file: UploadFile = File(...), user_id: str = Header(...), conn: asyncpg.Connection = Depends(get_db)):
+async def upload_document(file: UploadFile = File(...), user_id: str = Header(..., convert_underscores=False), conn: asyncpg.Connection = Depends(get_db)):
     """
     Upload and ingest a PDF document.
 
@@ -163,7 +163,7 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Header(..
 
 
 @router.get("/documents")
-async def list_documents(user_id: str = Header(...), conn: asyncpg.Connection = Depends(get_db)):
+async def list_documents(user_id: str = Header(..., convert_underscores=False), conn: asyncpg.Connection = Depends(get_db)):
     documents = await conn.fetch(
         "SELECT id, filename, uploaded_at FROM documents WHERE user_id = $1 ORDER BY uploaded_at DESC",
         user_id
