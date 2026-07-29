@@ -75,7 +75,7 @@ async def ask_question(request: AskRequest, user_id: str = Header(..., convert_u
         if not retrieved_chunks:
             return AskResponse(
                 query=query,
-                answer="No relevant information found in the indexed documents.",
+                answer="I don't have anything on that yet — feel free to upload a document or just ask me directly!",
                 sources=[]
             )
 
