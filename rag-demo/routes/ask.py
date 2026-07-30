@@ -10,6 +10,24 @@ from rag.embeddings import EmbeddingService
 from rag.retriever import DocumentRetriever
 from memory.cache import get_cache, set_cache
 
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "create_budget_alert",
+            "description": "Create a budget alert for the user when they want to be notified about spending in a category",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "description": "Spending category, e.g. food, transport"},
+                    "amount": {"type": "number", "description": "Alert threshold amount"}
+                },
+                "required": ["category", "amount"]
+            }
+        }
+    }
+]
+
 
 async def get_conversation_history(conn, user_id: str, session_id: str, limit: int = 10) -> list:
     rows = await conn.fetch("""
@@ -90,7 +108,10 @@ async def ask_question(request: AskRequest, user_id: str = Header(..., convert_u
         Answer naturally and conversationally like ChatGPT would.
         Use the context below to answer — but don't mention "documents" or "context" to the user.
 
-        {context}"""
+        Context:
+        {context}
+
+        User's question: {query}"""
 
         # Format context from retrieved chunks
         history = await get_conversation_history(conn, user_id, request.session_id)
@@ -112,9 +133,15 @@ async def ask_question(request: AskRequest, user_id: str = Header(..., convert_u
         gpt_response = await client.chat.completions.create(
             model="gpt-4o",
             max_tokens=1024,
-            messages=messages
+            messages=messages,
+            tools=tools
         )
-        answer = gpt_response.choices[0].message.content
+        response_message = gpt_response.choices[0].message
+
+        if response_message.tool_calls:
+            answer = f"[Function call requested: {response_message.tool_calls[0].function.name}]"
+        else:
+            answer = response_message.content
 
         await conn.execute(
             "INSERT INTO conversations (user_id, session_id, message, response) VALUES ($1, $2, $3, $4)",
