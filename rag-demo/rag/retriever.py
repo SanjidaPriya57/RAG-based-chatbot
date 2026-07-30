@@ -17,7 +17,7 @@ class DocumentRetriever:
         conn,
         user_id: str,
         top_k: int = 5,
-        similarity_threshold: float = 0.3
+        similarity_threshold: float = 0.15
     ) -> List[Tuple[str, float]]:
         query_embedding = await self.embedding_service.embed_text(query)
 
