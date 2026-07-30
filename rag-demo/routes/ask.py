@@ -139,7 +139,18 @@ async def ask_question(request: AskRequest, user_id: str = Header(..., convert_u
         response_message = gpt_response.choices[0].message
 
         if response_message.tool_calls:
-            answer = f"[Function call requested: {response_message.tool_calls[0].function.name}]"
+            import json
+            tool_call = response_message.tool_calls[0]
+            args = json.loads(tool_call.function.arguments)
+
+            if tool_call.function.name == "create_budget_alert":
+                await conn.execute(
+                    "INSERT INTO budget_alerts (user_id, category, amount) VALUES ($1, $2, $3)",
+                    user_id, args["category"], args["amount"]
+                )
+                answer = f"Got it — I'll alert you if your spending on {args['category']} goes over {args['amount']}."
+            else:
+                answer = "Sorry, I couldn't complete that action."
         else:
             answer = response_message.content
 
