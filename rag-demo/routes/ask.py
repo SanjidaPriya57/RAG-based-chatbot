@@ -25,6 +25,18 @@ tools = [
                 "required": ["category", "amount"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_budget_alerts",
+            "description": "List all budget alerts the user has set up",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
     }
 ]
 
@@ -149,6 +161,20 @@ async def ask_question(request: AskRequest, user_id: str = Header(..., convert_u
                     user_id, args["category"], args["amount"]
                 )
                 answer = f"Got it — I'll alert you if your spending on {args['category']} goes over {args['amount']}."
+
+            elif tool_call.function.name == "list_budget_alerts":
+                alerts = await conn.fetch(
+                    "SELECT category, amount FROM budget_alerts WHERE user_id = $1",
+                    user_id
+                )
+                if alerts:
+                    lines = [
+                        f"- {a['category']}: {a['amount']}" for a in alerts]
+                    answer = "Here are your current budget alerts:\n" + \
+                        "\n".join(lines)
+                else:
+                    answer = "You don't have any budget alerts set up yet."
+
             else:
                 answer = "Sorry, I couldn't complete that action."
         else:
