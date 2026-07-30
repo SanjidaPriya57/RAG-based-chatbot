@@ -77,6 +77,16 @@ async def init_db():
                 );
             """)
 
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS budget_alerts (
+                    id SERIAL PRIMARY KEY,
+                    user_id VARCHAR(255) NOT NULL,
+                    category VARCHAR(255) NOT NULL,
+                    amount NUMERIC NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
         logger.info("Database tables created/verified")
     except Exception as e:
         logger.error(f"Failed to initialize database: {e}")
