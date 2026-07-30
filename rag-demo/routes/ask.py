@@ -9,6 +9,7 @@ from db import get_db
 from rag.embeddings import EmbeddingService
 from rag.retriever import DocumentRetriever
 from memory.cache import get_cache, set_cache
+from fastapi.responses import StreamingResponse
 
 tools = [
     {
@@ -197,3 +198,21 @@ async def ask_question(request: AskRequest, user_id: str = Header(..., convert_u
         logger.error(f"Error processing question: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to process question: {str(e)}")
+
+
+@router.post("/ask-stream")
+async def ask_question_stream(request: AskRequest, user_id: str = Header(..., convert_underscores=False)):
+    async def generate():
+        client = AsyncOpenAI()
+        stream = await client.chat.completions.create(
+            model="gpt-4o",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": request.query}],
+            stream=True
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+
+    return StreamingResponse(generate(), media_type="text/plain")
