@@ -4,7 +4,7 @@ services:
     container_name: ai-finance-app
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - ./rag-demo:/app
 
@@ -38,7 +38,7 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
-      - "5434:5432"
+      - "5435:5432"
     networks:
       - backend
     healthcheck:
