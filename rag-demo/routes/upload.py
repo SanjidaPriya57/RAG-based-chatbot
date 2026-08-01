@@ -12,6 +12,7 @@ from memory.cache import set_cache
 import base64
 from openai import AsyncOpenAI
 import pandas as pd
+from tasks import process_document_task
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -115,24 +116,8 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Header(..
             is_image
         )
 
-        # Chunk document
-        chunker = DocumentChunker()
-        chunks = chunker.chunk_pdf_text(text_content)
-
-        # Generate embeddings
-        embedding_service = EmbeddingService()
-        embeddings = await embedding_service.embed_batch(chunks)
-
-        # Store chunks with embeddings
-        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            await conn.execute(
-                """INSERT INTO document_chunks (document_id, chunk_text, chunk_index, embedding)
-                VALUES ($1, $2, $3, $4)""",
-                doc_id,
-                chunk,
-                i,
-                f"[{','.join(map(str, embedding))}]"
-            )
+        # Offload chunking + embedding to background worker
+        process_document_task.delay(doc_id, text_content)
 
         # Cache document info
         await set_cache(
@@ -140,21 +125,19 @@ async def upload_document(file: UploadFile = File(...), user_id: str = Header(..
             {
                 "id": doc_id,
                 "filename": file.filename,
-                "chunks": len(chunks),
-                "status": "indexed"
+                "status": "processing"
             },
             ttl=3600
         )
 
         logger.info(
-            f"Document {file.filename} uploaded with ID {doc_id}, {len(chunks)} chunks created")
+            f"Document {file.filename} uploaded with ID {doc_id}, processing in background")
 
         return {
             "status": "success",
             "document_id": doc_id,
             "filename": file.filename,
-            "chunks": len(chunks),
-            "message": f"Document uploaded and indexed with {len(chunks)} chunks"
+            "message": "Document uploaded, processing in background"
         }
 
     except Exception as e:

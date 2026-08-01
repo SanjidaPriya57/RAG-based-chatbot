@@ -26,6 +26,26 @@ services:
         condition: service_started
     networks:
       - backend
+  worker:
+    build: ./rag-demo
+    container_name: ai-finance-worker
+    restart: unless-stopped
+    command: celery -A celery_app worker --loglevel=info
+    volumes:
+      - ./rag-demo:/app
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/finance_db
+      - REDIS_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - backend
 
   db:
     image: pgvector/pgvector:pg16
